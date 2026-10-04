@@ -1,0 +1,83 @@
+/* =========================================================
+   «Еда по фото»: окно распознавания, черновик, настройки ИИ,
+   блюда в дневнике. Использует переменные из styles.css.
+   ========================================================= */
+
+.ph-provider { display: flex; width: 100%; margin-bottom: 12px; }
+.ph-provider button { flex: 1; }
+.ph-warn { background: var(--warn-soft); color: var(--warn-text); }
+
+.ph-photos { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.ph-photos:empty { display: none; }
+.ph-thumb { position: relative; width: 96px; height: 96px; border-radius: var(--radius-sm); overflow: hidden; border: 1px solid var(--border); }
+.ph-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ph-thumb .icon-btn { position: absolute; top: 2px; right: 2px; width: 28px; height: 28px; background: rgba(0, 0, 0, .55); color: #fff; }
+.ph-thumb .icon-btn svg { width: 16px; height: 16px; }
+.ph-pick { margin-bottom: 6px; }
+.ph-pick label.btn { cursor: pointer; flex: 1 1 160px; }
+
+.ph-steps { margin: 0 0 10px; padding-left: 20px; font-size: .92rem; }
+.ph-steps li { margin-bottom: 8px; }
+.ph-prompt { white-space: pre-wrap; font-size: .8rem; background: var(--surface-2); padding: 8px; border-radius: 8px; max-height: 220px; overflow: auto; user-select: text; -webkit-user-select: text; }
+
+.ph-busy { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: var(--primary-soft); border-radius: var(--radius-sm); margin-top: 8px; font-size: .92rem; }
+.ph-busy[hidden] { display: none; }
+.ph-busy .btn { margin-left: auto; }
+.spinner { width: 20px; height: 20px; border: 3px solid var(--border-strong); border-top-color: var(--primary); border-radius: 50%; animation: ph-spin .8s linear infinite; flex: none; }
+@keyframes ph-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spinner { animation-duration: 2.4s; } }
+
+/* черновик */
+.ph-meta { display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; margin: -4px 0 6px; }
+.ph-conf-high { background: var(--g-ok-soft); }
+.ph-conf-mid { background: var(--g-high-soft); }
+.ph-conf-low { background: var(--g-low-soft); }
+.ph-mode { display: flex; width: 100%; margin: 4px 0 10px; }
+.ph-mode button { flex: 1; white-space: normal; line-height: 1.2; }
+.ph-rows { margin-bottom: 6px; }
+.ph-row { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 6px 10px; padding: 10px 0; border-top: 1px solid var(--border); }
+.ph-row:first-child { border-top: 0; }
+.ph-row-main { flex: 1 1 180px; min-width: 0; }
+.ph-row-name { font-weight: 550; overflow-wrap: anywhere; }
+.ph-row-meta { color: var(--muted); font-size: .82rem; font-variant-numeric: tabular-nums; }
+.ph-ai-name { color: var(--muted); font-size: .78rem; }
+.ph-mem { font-size: .8rem; color: var(--text-2); margin-top: 2px; }
+.ph-row-side { display: flex; align-items: center; gap: 4px; flex: none; }
+.ph-grams { display: inline-flex; align-items: center; gap: 4px; }
+.ph-grams input { width: 76px; min-height: 38px; text-align: right; }
+.ph-row-btns { display: flex; align-items: center; }
+.badge.ph-ai { background: var(--warn-soft); color: var(--warn-text); }
+.linklike { background: none; border: 0; padding: 0; color: var(--primary); text-decoration: underline; cursor: pointer; font: inherit; }
+
+.ph-picker { flex-basis: 100%; background: var(--surface-2); border-radius: var(--radius-sm); padding: 8px; margin: 6px 0; }
+.ph-picker .search-results { max-height: 220px; }
+
+.ph-totals { background: var(--surface-2); border-radius: var(--radius-sm); padding: 10px 12px; margin: 10px 0 12px; font-variant-numeric: tabular-nums; }
+.ph-totals > div:first-child { font-size: 1.1rem; }
+.ph-scale { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; margin-top: 8px; }
+.ph-scale input { width: 90px; min-height: 36px; }
+
+/* настройки */
+.ph-keyrow { display: flex; gap: 6px; }
+.ph-keyrow input { flex: 1; min-width: 0; font-family: ui-monospace, Consolas, monospace; }
+.ph-ref { display: flex; align-items: center; gap: 6px; padding: 6px 0; border-top: 1px solid var(--border); }
+.ph-ref:first-child { border-top: 0; }
+.ph-ref input[data-ref-name] { flex: 1; min-width: 0; }
+.ph-ref input[data-ref-cm] { width: 72px; text-align: right; }
+
+/* кнопка «По фото» и блюда в дневнике */
+.btn-photo .ph-cam { font-size: 1.05em; line-height: 1; }
+.photo-tip { margin: 6px 0 0; }
+.dish-row { border-top: 1px solid var(--border); padding: 4px 0; }
+.dish-row:first-child { border-top: 0; }
+.dish-row + .entry, .entry + .dish-row { border-top: 1px solid var(--border); }
+.dish-group > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+.dish-group > summary::-webkit-details-marker { display: none; }
+.dish-group > summary::before { content: '▸'; color: var(--muted); flex: none; transition: transform .15s; }
+.dish-group[open] > summary::before { transform: rotate(90deg); }
+.dish-group .dish-title { flex: 1; min-width: 0; font-weight: 600; overflow-wrap: anywhere; }
+.dish-group .dish-sum { color: var(--muted); font-size: .82rem; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.dish-group > .list { padding-left: 18px; }
+.dish-actions { padding: 2px 0 6px 18px; }
+.btn.danger-text { color: var(--danger); }
+.btn.danger-text:hover { background: var(--danger-soft); }

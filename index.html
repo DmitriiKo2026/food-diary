@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <meta name="description" content="Дневник питания и сахара крови — работает офлайн, данные хранятся только в вашем браузере.">
+  <meta name="theme-color" content="#fcfcfb" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#1a1a19" media="(prefers-color-scheme: dark)">
+  <!-- iPhone: запуск с экрана «Домой» как отдельное приложение -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Дневник">
+  <meta name="format-detection" content="telephone=no">
+  <title>Дневник питания и сахара</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='15' fill='%231baf7a'/%3E%3Cpath d='M16 7c4 5 6 8.5 6 11a6 6 0 0 1-12 0c0-2.5 2-6 6-11z' fill='%23fff'/%3E%3C/svg%3E">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <script>
+    // Манифест подключаем только при открытии через http(s): при file:// браузер не может его загрузить
+    if (/^https?:$/.test(location.protocol)) {
+      var mf = document.createElement('link');
+      mf.rel = 'manifest';
+      mf.href = 'manifest.webmanifest';
+      document.head.appendChild(mf);
+    }
+  </script>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/photo.css">
+</head>
+<body>
+  <a class="skip-link" href="#main">Перейти к содержимому</a>
+
+  <header class="app-header">
+    <div class="app-header-inner">
+      <h1 class="app-title">
+        <svg class="logo" viewBox="0 0 32 32" aria-hidden="true"><circle cx="16" cy="16" r="15"/><path d="M16 7c4 5 6 8.5 6 11a6 6 0 0 1-12 0c0-2.5 2-6 6-11z"/></svg>
+        Дневник питания и сахара
+      </h1>
+      <!-- Навигация: сверху на десктопе, снизу на телефоне -->
+      <nav class="tabbar" aria-label="Разделы">
+        <button type="button" class="tab" data-view="diary" aria-label="Дневник питания">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h11a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6zM6 3v18M10 8h6M10 12h6"/></svg>
+          <span>Дневник</span>
+        </button>
+        <button type="button" class="tab" data-view="glucose" aria-label="Сахар крови">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3c4.5 5.5 7 9.3 7 12a7 7 0 0 1-14 0c0-2.7 2.5-6.5 7-12z"/></svg>
+          <span>Сахар</span>
+        </button>
+        <button type="button" class="tab" data-view="stats" aria-label="Статистика">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg>
+          <span>Статистика</span>
+        </button>
+        <button type="button" class="tab" data-view="foods" aria-label="Продукты">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 7c-1.5-2-5-2.2-6.5.3C4 10 5 15 7.5 18.5c1.3 1.8 2.8 2.3 4.5 1.3 1.7 1 3.2.5 4.5-1.3C19 15 20 10 18.5 7.3 17 4.8 13.5 5 12 7zM12 7c0-2 1-3.5 3-4"/></svg>
+          <span>Продукты</span>
+        </button>
+        <button type="button" class="tab" data-view="settings" aria-label="Настройки">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1 7 17M17 7l2.1-2.1"/></svg>
+          <span>Настройки</span>
+        </button>
+      </nav>
+      <button type="button" class="icon-btn header-sync" data-action="quick-sync" aria-label="Синхронизация" title="Синхронизация">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 0 0-14.3-4.9L4 8M4 4v4h4M4 13a8 8 0 0 0 14.3 4.9L20 16M20 20v-4h-4"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- Плашки: новая версия, установка на iPhone, напоминание о синхронизации (app.js) -->
+  <div id="banners"></div>
+
+  <div id="storage-warning" class="banner banner-warn" role="status" hidden>
+    Хранилище браузера недоступно (возможно, включён приватный режим или запрещено хранение данных).
+    Записи будут потеряны после закрытия страницы — сделайте экспорт в JSON в «Настройках».
+  </div>
+
+  <main id="main" class="container">
+
+    <!-- ===================== ДНЕВНИК ===================== -->
+    <section id="view-diary" class="view" aria-labelledby="h-diary" hidden>
+      <h2 id="h-diary" class="visually-hidden">Дневник питания</h2>
+      <div class="datebar">
+        <button type="button" class="icon-btn" data-action="day" data-delta="-1" aria-label="Предыдущий день">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <div class="datebar-center">
+          <input type="date" class="date-input" aria-label="Выбрать дату">
+          <div class="date-caption"></div>
+        </div>
+        <button type="button" class="icon-btn" data-action="day" data-delta="1" aria-label="Следующий день">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm today-btn" data-action="today">Сегодня</button>
+      </div>
+      <div id="diary-summary"></div>
+      <div id="diary-meals"></div>
+    </section>
+
+    <!-- ===================== САХАР ===================== -->
+    <section id="view-glucose" class="view" aria-labelledby="h-glucose" hidden>
+      <h2 id="h-glucose" class="visually-hidden">Сахар крови</h2>
+      <div class="datebar">
+        <button type="button" class="icon-btn" data-action="day" data-delta="-1" aria-label="Предыдущий день">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <div class="datebar-center">
+          <input type="date" class="date-input" aria-label="Выбрать дату">
+          <div class="date-caption"></div>
+        </div>
+        <button type="button" class="icon-btn" data-action="day" data-delta="1" aria-label="Следующий день">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm today-btn" data-action="today">Сегодня</button>
+      </div>
+      <div id="glucose-content"></div>
+    </section>
+
+    <!-- ===================== СТАТИСТИКА ===================== -->
+    <section id="view-stats" class="view" aria-labelledby="h-stats" hidden>
+      <div class="view-head">
+        <h2 id="h-stats">Статистика</h2>
+        <div class="view-head-tools">
+          <div class="segmented" role="group" aria-label="Период">
+            <button type="button" data-action="period" data-days="7">7 дн.</button>
+            <button type="button" data-action="period" data-days="14">14 дн.</button>
+            <button type="button" data-action="period" data-days="30">30 дн.</button>
+            <button type="button" data-action="period" data-days="90">90 дн.</button>
+          </div>
+          <button type="button" class="btn btn-sm" data-action="print-report" title="Таблица сахара и питания за выбранный период — для печати или сохранения в PDF">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 9V3h10v6M7 18H4v-7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v7h-3M7 14h10v7H7z"/></svg>
+            Отчёт для врача
+          </button>
+        </div>
+      </div>
+      <div id="stats-content"></div>
+    </section>
+
+    <!-- ===================== ПРОДУКТЫ ===================== -->
+    <section id="view-foods" class="view" aria-labelledby="h-foods" hidden>
+      <div class="view-head">
+        <h2 id="h-foods">Продукты</h2>
+        <button type="button" class="btn btn-primary" data-action="new-food">+ Новый продукт</button>
+      </div>
+      <div class="card toolbar">
+        <div class="field grow">
+          <label for="food-search">Поиск</label>
+          <input id="food-search" type="search" placeholder="Название продукта…" autocomplete="off">
+        </div>
+        <div class="field">
+          <label for="food-cat">Категория</label>
+          <select id="food-cat"></select>
+        </div>
+        <label class="check">
+          <input id="food-only-custom" type="checkbox"> Только мои
+        </label>
+      </div>
+      <p class="muted small" id="food-count"></p>
+      <div id="food-list"></div>
+    </section>
+
+    <!-- ===================== НАСТРОЙКИ ===================== -->
+    <section id="view-settings" class="view" aria-labelledby="h-settings" hidden>
+      <div class="view-head"><h2 id="h-settings">Настройки</h2></div>
+      <div id="settings-content"></div>
+    </section>
+
+  </main>
+
+  <footer class="app-footer">
+    Приложение не является медицинским изделием и не заменяет консультацию врача.
+    Решения о лечении, дозах препаратов и диете принимайте вместе с лечащим врачом.
+  </footer>
+
+  <!-- Модальное окно (содержимое формируется в app.js) -->
+  <div id="modal" class="modal-overlay" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modal-title">
+      <div class="modal-head">
+        <h2 id="modal-title"></h2>
+        <button type="button" class="icon-btn" data-modal-close aria-label="Закрыть">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
+      </div>
+      <form id="modal-form" novalidate>
+        <div class="modal-body" id="modal-body"></div>
+        <div class="modal-foot" id="modal-foot"></div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Отчёт для врача: на экране не виден, заполняется перед печатью (app.js) -->
+  <div id="print-report" class="print-report"></div>
+
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+  <div id="chart-tip" class="chart-tip" hidden></div>
+  <input type="file" id="import-file" accept=".json,application/json" hidden>
+  <input type="file" id="sync-file" accept=".json,application/json" hidden>
+
+  <!-- Обычные скрипты (не модули), чтобы всё работало при открытии через file:// -->
+  <script src="js/foods.js"></script>
+  <script src="js/search.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/sync.js"></script>
+  <script src="js/charts.js"></script>
+  <script src="js/ai.js"></script>
+  <script src="js/photo.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
