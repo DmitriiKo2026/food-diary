@@ -1,0 +1,69 @@
+{
+ "version": "mcs0-v1",
+ "n": 1965,
+ "dim": 512,
+ "namesHash": "2c32498b",
+ "firstId": "b1",
+ "lastId": "b1965",
+ "matrix": {
+  "file": "foods_text_512.bin",
+  "layout": "int8[n*dim], float32[n] scale, float32[n] bias"
+ },
+ "files": [
+  {
+   "path": "models/mcs0-v1/vision_fp16.onnx",
+   "bytes": 22876479,
+   "sha256": "22b1d36ecc6837e8205aee05003440a25e1c1ee0c7e2945dbb9dd597211c59dc",
+   "pack": "core"
+  },
+  {
+   "path": "models/mcs0-v1/foods_text_512.bin",
+   "bytes": 1021800,
+   "sha256": "75732613edf4200244c92a6fd5b96c4cca37383a928abc14080d9be5e8a88178",
+   "pack": "core"
+  },
+  {
+   "path": "js/vendor/ort/ort.wasm.min.mjs",
+   "bytes": 50195,
+   "sha256": "1617c813ada08592706d29a9963ab6258864dce4299bd402d2196bd648b63bfe",
+   "pack": "core"
+  },
+  {
+   "path": "js/vendor/ort/ort-wasm-simd-threaded.mjs",
+   "bytes": 24381,
+   "sha256": "c57ca56328877353a575e51bbca6f18450027d6c9bf2307a2cb2c41363b4de9f",
+   "pack": "core"
+  },
+  {
+   "path": "js/vendor/ort/ort-wasm-simd-threaded.wasm",
+   "bytes": 14264838,
+   "sha256": "06ba057753da3847e4c24f02d91ab133455b0817c69a44993a9a53a2146df9e3",
+   "pack": "core"
+  },
+  {
+   "path": "js/vendor/ort/ort.min.mjs",
+   "bytes": 368019,
+   "sha256": "e000c8bc059ddaf10eab26bce50d2175fde55dc648e3e14f2106252ffb7b215f",
+   "pack": "webgpu"
+  },
+  {
+   "path": "js/vendor/ort/ort-wasm-simd-threaded.jsep.mjs",
+   "bytes": 46851,
+   "sha256": "c2f80e915e9df63289788a99d434d8c4e00e64e9c1f030f4b80b022458dd2c99",
+   "pack": "webgpu"
+  },
+  {
+   "path": "js/vendor/ort/ort-wasm-simd-threaded.jsep.wasm.part1",
+   "bytes": 14176442,
+   "sha256": "c24eada5b4ff6e1fc3a10d9b1f2c40c682be98c28642664f1c2b430f69e3758a",
+   "pack": "webgpu"
+  },
+  {
+   "path": "js/vendor/ort/ort-wasm-simd-threaded.jsep.wasm.part2",
+   "bytes": 14176443,
+   "sha256": "56b7f77d9f9ec4efb0f9bfb182dd5eaab0f9bbbb7c4c0c0d3c010735fb6f4009",
+   "pack": "webgpu"
+  }
+ ],
+ "built": "2026-10-12"
+}

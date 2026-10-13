@@ -1,0 +1,22 @@
+ПРИМЕЧАНИЕ О МОДЕЛИ РАСПОЗНАВАНИЯ («На устройстве») / NOTICE FOR THE RECOGNITION MODEL
+
+Файлы в этой папке (models/mcs0-v1/) — нейросеть для распознавания еды по фото:
+
+  vision_fp16.onnx      картиночная часть модели MobileCLIP-S0 (Apple), преобразованная в формат ONNX
+                        (fp16) проектом transformers.js / Xenova (https://huggingface.co/Xenova/mobileclip_s0).
+                        Веса не переобучались и не изменялись, только формат файла.
+  foods_text_512.bin    таблица «вектор названия» для каждого продукта базы приложения (js/foods.js).
+                        Получена этим же текстовым кодировщиком MobileCLIP-S0 по английским описаниям
+                        продуктов (машинный перевод + ручные пояснения), округлена до int8.
+                        Это производный от модели файл (Model Derivative).
+  meta.json             описание файлов (размеры, контрольные суммы).
+
+Apple Machine Learning Research Model is licensed under the Apple Machine Learning Research Model License Agreement.
+(Лицензия — в файле models/LICENSE-MobileCLIP-Apple.txt; оригинал: https://huggingface.co/apple/MobileCLIP-S0)
+
+Важно: лицензия Apple разрешает использовать модель только в исследовательских, некоммерческих целях
+(личное, бесплатное, некоммерческое приложение). Коммерческое использование, продукты и сервисы на её основе
+лицензией НЕ разрешены. Название и логотипы Apple не используются для продвижения этого приложения; приложение
+не связано с Apple и не одобрено ею. Модель предоставляется «как есть», без гарантий.
+
+Скрипты запуска модели в браузере — ONNX Runtime Web (js/vendor/ort/), Copyright (c) Microsoft Corporation, лицензия MIT (см. js/vendor/ort/NOTICE.txt).
