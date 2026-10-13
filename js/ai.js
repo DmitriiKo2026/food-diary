@@ -3,8 +3,10 @@
  * память исправлений. Без интерфейса (интерфейс — в photo.js).
  *
  * Провайдеры:
- *   - gemini  — Google Gemini API (бесплатный уровень, ключ пользователя из Google AI Studio);
- *   - manual  — «через любой чат-ИИ»: запрос копируется, ответ вставляется вручную.
+ *   - ondevice — нейросеть в самом браузере (js/ondevice.js), по умолчанию: бесплатно, без ключа, офлайн после загрузки модели;
+ *   - gemini  — Google Gemini API (бесплатный уровень, ключ пользователя из Google AI Studio;
+ *               из России и ряда других стран недоступен — ошибка «User location is not supported»);
+ *   - manual  — «через любой чат-ИИ»: запрос копируется, ответ вставляется вручную (запасной вариант).
  * Абстракция AI.providers позволяет позже добавить платный провайдер без переделки интерфейса:
  * провайдер — объект { id, label, needsKey, recognize(opts) → Promise<результат> }.
  *
@@ -16,11 +18,14 @@ var AI = (function () {
 
   var KEY_STORAGE = 'ft_v1_ai_key';
   var MODEL_STORAGE = 'ft_v1_ai_model';
-  var PROVIDER_STORAGE = 'ft_v1_ai_provider';
+  var PROVIDER_STORAGE = 'ft_v1_ai_provider2';
+  var PROVIDER_STORAGE_OLD = 'ft_v1_ai_provider';   // выбор из версий до «На устройстве» — игнорируем и удаляем вместе с остальным
+  var REGION_STORAGE = 'ft_v1_ai_region';   // последний запрос к Gemini: «недоступен в вашей стране» (время)
 
   var config = {
     baseUrl: 'https://generativelanguage.googleapis.com/v1beta',
-    timeoutMs: 90000
+    timeoutMs: 60000,        // предельное время ответа на распознавание (жёсткий срок, не зависит от сети)
+    probeTimeoutMs: 15000    // за это время должен ответить лёгкий запрос «есть ли связь с Google»
   };
 
   // Бесплатные модели (по странице цен Gemini API, октябрь 2026). Список с сервера имеет приоритет.
@@ -40,10 +45,24 @@ var AI = (function () {
   function setKey(k) { return lsSet(KEY_STORAGE, (k || '').trim()); }
   function getModel() { return lsGet(MODEL_STORAGE) || DEFAULT_MODEL; }
   function setModel(m) { return lsSet(MODEL_STORAGE, m); }
-  function getProvider() { var p = lsGet(PROVIDER_STORAGE); return p === 'manual' || p === 'gemini' ? p : (getKey() ? 'gemini' : 'manual'); }
+  // По умолчанию — «На устройстве» (без ключа и интернета, работает и из России), если модуль подключён;
+  // Gemini и ручной режим — в интерфейсе в разделе «Другие способы»
+  // (ключ хранения новый: выбор, сделанный в старой версии, не должен навсегда оставлять «Через любой чат-ИИ» вместо нового способа)
+  function getProvider() {
+    var p = lsGet(PROVIDER_STORAGE);
+    if (p === 'manual' || p === 'gemini' || (p === 'ondevice' && typeof OnDevice !== 'undefined')) return p;
+    if (typeof OnDevice !== 'undefined' && OnDevice.supported().ok) return 'ondevice';
+    return getKey() ? 'gemini' : 'manual';
+  }
   function setProvider(p) { return lsSet(PROVIDER_STORAGE, p); }
-  /** Удалить всё, что связано с ИИ на этом устройстве (ключ, модель, выбор провайдера) */
-  function forgetDeviceSettings() { lsSet(KEY_STORAGE, null); lsSet(MODEL_STORAGE, null); lsSet(PROVIDER_STORAGE, null); }
+  /** Отметка «Gemini недоступен отсюда» (регион или сервер Google не отвечает): {code, ts} или null */
+  function getRegionBlock() { try { var o = JSON.parse(lsGet(REGION_STORAGE) || 'null'); return o && o.ts ? o : null; } catch (e) { return null; } }
+  function setRegionBlock(code) { return lsSet(REGION_STORAGE, code ? JSON.stringify({ code: code, ts: Date.now() }) : null); }
+
+  /** Удалить всё, что связано с ИИ на этом устройстве (ключ, модель, выбор способа, отметки) */
+  function forgetDeviceSettings() {
+    [KEY_STORAGE, MODEL_STORAGE, PROVIDER_STORAGE, PROVIDER_STORAGE_OLD, REGION_STORAGE].forEach(function (k) { lsSet(k, null); });
+  }
 
   // ---------- ошибки ----------
   function AIError(code, message, detail) {
@@ -59,13 +78,14 @@ var AI = (function () {
     key: 'Ключ Gemini не подходит (неверный, отозван или заблокирован). Проверьте ключ в «Настройках» — скопируйте его из Google AI Studio заново.',
     denied: 'У ключа нет доступа к Gemini API. Создайте новый ключ в Google AI Studio (aistudio.google.com/apikey).',
     quota: 'Исчерпан бесплатный лимит запросов Gemini. Подождите минуту (или до завтра, если исчерпан дневной лимит), выберите в настройках другую модель или воспользуйтесь режимом «Через любой чат-ИИ».',
-    region: 'Gemini API недоступен в вашем регионе. Используйте режим «Через любой чат-ИИ» — он работает с любым чат-ботом.',
+    region: 'Gemini API недоступен из вашей страны: Google не обслуживает запросы из России и ряда других стран. Пока можно воспользоваться режимом «Через любой чат-ИИ».',
+    unreachable: 'Сервер Google Gemini не отвечает. Из России Gemini API недоступен: соединение с Google блокируется или замедляется, а сам Google не обслуживает запросы из России. Пока можно воспользоваться режимом «Через любой чат-ИИ».',
     model: 'Выбранная модель недоступна. Выберите другую модель в «Настройках → Распознавание по фото».',
     billing: 'Google требует оплату для этой модели или проекта. Выберите бесплатную модель (Flash) или режим «Через любой чат-ИИ».',
     safety: 'ИИ отказался обрабатывать это фото (сработал фильтр безопасности). Попробуйте другое фото или режим «Через любой чат-ИИ».',
     offline: 'Нет подключения к интернету. Распознавание через Gemini работает только онлайн — можно воспользоваться режимом «Через любой чат-ИИ» позже.',
-    network: 'Не удалось связаться с сервером Gemini. Проверьте интернет и попробуйте ещё раз.',
-    timeout: 'Gemini слишком долго отвечает. Попробуйте ещё раз (можно с меньшим числом фото).',
+    network: 'Не удалось связаться с сервером Gemini. Проверьте интернет и попробуйте ещё раз. Если интернет работает, а ошибка повторяется, — скорее всего, Gemini недоступен из вашей сети или страны.',
+    timeout: 'Gemini не ответил за минуту. Попробуйте ещё раз (можно с одним фото). Если так каждый раз — скорее всего, Gemini недоступен из вашей сети или страны.',
     server: 'Сервер Gemini временно перегружен. Попробуйте через минуту.',
     json: 'ИИ вернул ответ в неожиданном формате. Попробуйте ещё раз или воспользуйтесь режимом «Через любой чат-ИИ».',
     empty: 'ИИ не нашёл на фото еду. Попробуйте снять ближе и при хорошем освещении.',
@@ -81,7 +101,7 @@ var AI = (function () {
     var msg = String(err.message || '');
     var st = String(err.status || err.code || '').toUpperCase();
     var reasons = (err.details || []).map(function (d) { return (d && d.reason) || ''; }).join(' ');
-    if (/location is not supported|not available in your country|unsupported.*(region|country)/i.test(msg)) return new AIError('region', MSG.region, msg);
+    if (/location is not supported|not (available|supported) in your (country|region|location)|unsupported.*(region|country|location)/i.test(msg)) return new AIError('region', MSG.region, msg);
     if (/API_KEY_INVALID|API_KEY_EXPIRED|API key not valid|api key expired|leaked/i.test(reasons + ' ' + msg) || status === 401) return new AIError('key', MSG.key, msg);
     // 429 проверяем раньше «billing»: текст Google о лимите упоминает «plan and billing details»
     if (status === 429 || /RESOURCE_EXHAUSTED|quota/i.test(st + ' ' + msg)) return new AIError('quota', MSG.quota, msg);
@@ -316,28 +336,66 @@ var AI = (function () {
   }
 
   // ---------- сеть ----------
-  function fetchJson(url, init) {
+  /**
+   * fetch + JSON с ЖЁСТКИМ сроком: промис завершается по таймеру сам, даже если отмена запроса
+   * не дошла до сети (зависшее TLS-соединение и т.п.) — интерфейс не «висит» минутами.
+   * init.cancelSignal — внешняя отмена (кнопка «Отменить»). timeoutMs — срок (по умолчанию config.timeoutMs).
+   */
+  function fetchJson(url, init, timeoutMs) {
     if (typeof navigator !== 'undefined' && navigator.onLine === false) return Promise.reject(new AIError('offline', MSG.offline));
     var ctl = typeof AbortController === 'function' ? new AbortController() : null;
-    var timer = ctl ? setTimeout(function () { ctl.abort(); }, config.timeoutMs) : null;
     if (ctl) init.signal = ctl.signal;
     var outer = init.cancelSignal;
-    if (outer && ctl) outer.addEventListener('abort', function () { ctl.abort(); });
     delete init.cancelSignal;
-    return fetch(url, init).then(function (resp) {
-      return resp.text().then(function (t) {
+    return new Promise(function (resolve, reject) {
+      var done = false, timer = null;
+      function finish(ok, v) {
+        if (done) return;
+        done = true;
         clearTimeout(timer);
-        var body = null;
-        try { body = t ? JSON.parse(t) : null; } catch (e) { body = null; }
-        if (!resp.ok) throw mapHttpError(resp.status, body);
-        return body;
+        if (outer) outer.removeEventListener('abort', onCancel);
+        (ok ? resolve : reject)(v);
+      }
+      function onCancel() { if (ctl) ctl.abort(); finish(false, new AIError('cancel', 'Отменено')); }
+      if (outer) {
+        if (outer.aborted) { onCancel(); return; }
+        outer.addEventListener('abort', onCancel);
+      }
+      timer = setTimeout(function () { if (ctl) ctl.abort(); finish(false, new AIError('timeout', MSG.timeout)); }, timeoutMs || config.timeoutMs);
+      fetch(url, init).then(function (resp) {
+        return resp.text().then(function (t) {
+          var body = null;
+          try { body = t ? JSON.parse(t) : null; } catch (e) { body = null; }
+          if (!resp.ok) throw mapHttpError(resp.status, body);
+          finish(true, body);
+        });
+      }).catch(function (e) {
+        if (e instanceof AIError) { finish(false, e); return; }
+        var off = typeof navigator !== 'undefined' && navigator.onLine === false;
+        finish(false, new AIError(off ? 'offline' : 'network', off ? MSG.offline : MSG.network, String(e && e.message)));
       });
-    }, function (e) {
-      clearTimeout(timer);
-      if (outer && outer.aborted) throw new AIError('cancel', 'Отменено');
-      if (e && e.name === 'AbortError') throw new AIError('timeout', MSG.timeout);
-      throw new AIError(navigator.onLine === false ? 'offline' : 'network', navigator.onLine === false ? MSG.offline : MSG.network, String(e && e.message));
     });
+  }
+
+  /** Запрос к Gemini; ответ «недоступен в вашей стране» запоминается (показываем предупреждение заранее) */
+  function gemFetch(url, init, timeoutMs) {
+    return fetchJson(url, init, timeoutMs).then(function (body) { return body; }, function (e) {
+      if (e && (e.code === 'region' || e.code === 'unreachable')) setRegionBlock(e.code);
+      throw e;
+    });
+  }
+
+  /**
+   * Лёгкая проверка связи с Google (список из одной модели — не расходует лимит генерации).
+   * Возвращает Promise<'ok' | AIError>: 'ok' — сервер ответил (даже ошибкой ключа — связь есть).
+   */
+  function probeConnection(key, signal) {
+    return fetchJson(config.baseUrl + '/models?pageSize=1', { method: 'GET', headers: { 'x-goog-api-key': key }, cancelSignal: signal }, config.probeTimeoutMs)
+      .then(function () { return 'ok'; }, function (e) {
+        if (e.code === 'timeout' || e.code === 'network') return new AIError('unreachable', MSG.unreachable, e.code);
+        if (e.code === 'region' || e.code === 'cancel' || e.code === 'offline') return e;
+        return 'ok'; // сервер ответил ошибкой (ключ, лимит…) — связь есть, подробности даст основной запрос
+      });
   }
 
   function headers(key) { return { 'Content-Type': 'application/json', 'x-goog-api-key': key }; }
@@ -345,7 +403,10 @@ var AI = (function () {
   /** Список подходящих моделей: генерация контента, Flash/Flash-Lite, без TTS/Live/изображений */
   function listModels(key) {
     if (!key) return Promise.reject(new AIError('nokey', MSG.nokey));
-    return fetchJson(config.baseUrl + '/models?pageSize=1000', { method: 'GET', headers: { 'x-goog-api-key': key } }).then(function (body) {
+    return gemFetch(config.baseUrl + '/models?pageSize=1000', { method: 'GET', headers: { 'x-goog-api-key': key } }, 20000).catch(function (e) {
+      if (e && (e.code === 'timeout' || e.code === 'network')) { setRegionBlock('unreachable'); throw new AIError('unreachable', MSG.unreachable, e.code); }
+      throw e;
+    }).then(function (body) {
       var ids = ((body && body.models) || []).filter(function (m) {
         var id = String(m.name || '').replace(/^models\//, '');
         return (m.supportedGenerationMethods || []).indexOf('generateContent') >= 0 &&
@@ -367,11 +428,33 @@ var AI = (function () {
     });
   }
 
-  function checkKey(key) { return listModels(key).then(function (ids) { return { ok: true, models: ids }; }); }
+  /**
+   * Проверка ключа: список моделей + крошечный запрос генерации. Список моделей может отвечать
+   * и там, где генерация запрещена («User location is not supported»), — поэтому проверяем и её.
+   * Результат: {ok, models, warning?: 'quota'}; ошибки — AIError (region, unreachable, key…).
+   */
+  function checkKey(key) {
+    return listModels(key).then(function (ids) {
+      var cur = getModel();
+      var model = ids.indexOf(cur) >= 0 ? cur : ids.indexOf(DEFAULT_MODEL) >= 0 ? DEFAULT_MODEL : (ids[0] || cur);
+      var body = JSON.stringify({ contents: [{ role: 'user', parts: [{ text: 'Ответь одним словом: да' }] }], generationConfig: { maxOutputTokens: 16, temperature: 0 } });
+      return gemFetch(config.baseUrl + '/models/' + encodeURIComponent(model) + ':generateContent', { method: 'POST', headers: headers(key), body: body }, 25000)
+        .then(function () { setRegionBlock(null); return { ok: true, models: ids }; }, function (e) {
+          if (e && e.code === 'quota') return { ok: true, models: ids, warning: 'quota' }; // ключ рабочий, лимит на сегодня исчерпан
+          if (e && (e.code === 'timeout' || e.code === 'network')) { setRegionBlock('unreachable'); throw new AIError('unreachable', MSG.unreachable, e.code); }
+          throw e;
+        });
+    });
+  }
 
   /**
-   * Gemini: распознать. opts: {key, model, images:[{mime,data}], refs, hint, totalWeight, learned, signal}
-   * При неверном JSON — одна автоматическая повторная попытка.
+   * Gemini: распознать. opts: {key, model, images:[{mime,data}], refs, hint, totalWeight, learned, signal,
+   * onStatus(state)} — state: 'connecting' (проверяем связь с Google), 'waiting' (связь есть, ИИ думает).
+   *
+   * Быстрый отказ: параллельно с распознаванием идёт лёгкий запрос «есть ли связь с Google».
+   * Если он не ответил за config.probeTimeoutMs (типично для России: соединение с Google блокируется
+   * или «замирает»), распознавание прерывается сразу с понятным сообщением, а не через минуты.
+   * При неверном JSON или перегрузке сервера — одна автоматическая повторная попытка.
    */
   function recognizeGemini(opts) {
     var key = opts.key || getKey();
@@ -380,15 +463,46 @@ var AI = (function () {
     var body = JSON.stringify(buildRequest(opts.images, opts));
     if (body.length > 19 * 1024 * 1024) return Promise.reject(new AIError('toobig', MSG.toobig));
     var url = config.baseUrl + '/models/' + encodeURIComponent(model) + ':generateContent';
-    var attempt = function (n) {
-      return fetchJson(url, { method: 'POST', headers: headers(key), body: body, cancelSignal: opts.signal })
-        .then(readGeminiResponse)
-        .catch(function (e) {
-          if (n === 0 && e && (e.code === 'json' || e.code === 'server')) return attempt(1);
-          throw e;
-        });
-    };
-    return attempt(0).then(function (res) { res.provider = 'gemini'; res.model = model; return res; });
+    var status = typeof opts.onStatus === 'function' ? opts.onStatus : function () {};
+    // внутренняя отмена: кнопка «Отменить» или вывод проверки связи «Google недоступен»
+    var inner = typeof AbortController === 'function' ? new AbortController() : null;
+    var outer = opts.signal;
+    return new Promise(function (resolve, reject) {
+      var done = false;
+      function finish(ok, v) {
+        if (done) return;
+        done = true;
+        if (outer) outer.removeEventListener('abort', onCancel);
+        if (inner && !ok) inner.abort();
+        (ok ? resolve : reject)(v);
+      }
+      function onCancel() { finish(false, new AIError('cancel', 'Отменено')); }
+      if (outer) {
+        if (outer.aborted) { onCancel(); return; }
+        outer.addEventListener('abort', onCancel);
+      }
+      status('connecting');
+      probeConnection(key, inner && inner.signal).then(function (r) {
+        if (done) return;
+        if (r === 'ok') { status('waiting'); return; }
+        if (r.code === 'cancel') return;
+        if (r.code === 'region' || r.code === 'unreachable') setRegionBlock(r.code);
+        finish(false, r);
+      });
+      var attempt = function (n) {
+        return gemFetch(url, { method: 'POST', headers: headers(key), body: body, cancelSignal: inner && inner.signal })
+          .then(readGeminiResponse)
+          .catch(function (e) {
+            if (!done && n === 0 && e && (e.code === 'json' || e.code === 'server')) return attempt(1);
+            throw e;
+          });
+      };
+      attempt(0).then(function (res) {
+        setRegionBlock(null);
+        res.provider = 'gemini'; res.model = model;
+        finish(true, res);
+      }, function (e) { finish(false, e); });
+    });
   }
 
   /** Ручной режим: разбор вставленного ответа */
@@ -401,6 +515,17 @@ var AI = (function () {
   }
 
   var providers = {
+    // нейросеть в самом браузере (js/ondevice.js): после разовой загрузки модели без интернета и ключа
+    ondevice: {
+      id: 'ondevice', label: 'На устройстве', needsKey: false, local: true,
+      recognize: function (opts) {
+        if (typeof OnDevice === 'undefined') return Promise.reject(new AIError('unknown', MSG.unknown + 'модуль «На устройстве» не загружен'));
+        return OnDevice.recognize(opts).catch(function (e) {
+          if (e instanceof AIError) throw e;
+          throw new AIError((e && e.code) || 'unknown', e && e.message ? e.message : MSG.unknown + String(e), e && e.detail);
+        });
+      }
+    },
     gemini: { id: 'gemini', label: 'Gemini (бесплатный ключ)', needsKey: true, recognize: recognizeGemini },
     manual: { id: 'manual', label: 'Через любой чат-ИИ', needsKey: false, parse: parseManual }
   };
@@ -417,7 +542,10 @@ var AI = (function () {
       if (!file) { reject(new AIError('image', MSG.image)); return; }
       var url = URL.createObjectURL(file);
       var img = new Image();
+      // на всякий случай: если браузер так и не открыл фото (ни onload, ни onerror) — не ждём вечно
+      var guard = setTimeout(function () { img.onload = img.onerror = null; URL.revokeObjectURL(url); reject(new AIError('image', MSG.image, 'decode timeout')); }, 30000);
       img.onload = function () {
+        clearTimeout(guard);
         try {
           var w = img.naturalWidth, h = img.naturalHeight;
           if (!w || !h) throw new Error('size');
@@ -433,7 +561,7 @@ var AI = (function () {
           resolve({ mime: 'image/jpeg', data: dataUrl.split(',')[1], width: cw, height: ch, preview: dataUrl });
         } catch (e) { URL.revokeObjectURL(url); reject(new AIError('image', MSG.image, String(e))); }
       };
-      img.onerror = function () { URL.revokeObjectURL(url); reject(new AIError('image', MSG.image, file.type)); };
+      img.onerror = function () { clearTimeout(guard); URL.revokeObjectURL(url); reject(new AIError('image', MSG.image, file.type)); };
       img.src = url;
     });
   }
@@ -493,6 +621,7 @@ var AI = (function () {
     MSG: MSG,
     getKey: getKey, setKey: setKey, getModel: getModel, setModel: setModel,
     getProvider: getProvider, setProvider: setProvider, forgetDeviceSettings: forgetDeviceSettings,
+    getRegionBlock: getRegionBlock, setRegionBlock: setRegionBlock, probeConnection: probeConnection,
     buildPrompt: buildPrompt, buildRequest: buildRequest,
     parseLoose: parseLoose, normalizeResult: normalizeResult, readGeminiResponse: readGeminiResponse, mapHttpError: mapHttpError,
     listModels: listModels, sortModels: sortModels, checkKey: checkKey,

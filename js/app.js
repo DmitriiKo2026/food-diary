@@ -2264,10 +2264,11 @@
         '</section>' +
       '</div>' +
       '</div>' +
-      (function () { var p = PhotoUI.settingsParts(); return '<div class="grid-2">' + p.ai + '<div>' + p.refs + p.mem + '</div></div>'; })() +
+      (function () { var p = PhotoUI.settingsParts(); return '<div class="grid-2"><div>' + p.od + p.ai + '</div><div>' + p.refs + p.mem + '</div></div>'; })() +
       '<p class="disclaimer"><b>Важно.</b> Приложение не является медицинским изделием. Расчёты калорий, ГИ и ГН ориентировочные. ' +
         'Не используйте его для подбора доз инсулина и других препаратов — по всем вопросам лечения консультируйтесь с врачом.</p>';
     $('#settings-content').innerHTML = html;
+    PhotoUI.settingsRendered(); // подгружает данные блока «На устройстве» (установлена ли модель, сколько блюд в личной памяти)
   }
 
   function settingsError(msg, fieldId) {
@@ -2584,13 +2585,15 @@
   }
 
   function clearAll() {
-    if (!window.confirm('Удалить ВСЕ данные: дневник питания, измерения сахара, активность, ваши продукты, запомненные исправления распознавания и настройки?\n\n' +
-      'С этого устройства также будет удалён ключ Gemini (его можно снова скопировать из Google AI Studio).\n\n' +
+    if (!window.confirm('Удалить ВСЕ данные: дневник питания, измерения сахара, активность, ваши продукты, запомненные исправления распознавания, личную память блюд («На устройстве») и настройки?\n\n' +
+      'С этого устройства также будет удалён ключ Gemini (его можно снова скопировать из Google AI Studio). Скачанная модель распознавания останется (её можно удалить в «Настройки → На устройстве»).\n\n' +
       'Если вы пользуетесь синхронизацией, после следующей синхронизации эти записи удалятся и на других устройствах.\n\nРекомендуем сначала сделать резервную копию (экспорт в JSON).')) return;
     if (!window.confirm('Это действие необратимо. Точно удалить все данные?')) return;
     Store.clearAll();
     AI.forgetDeviceSettings(); // ключ Gemini, выбранная модель и способ распознавания
     try { window.localStorage.removeItem('ft_v1_ai_models'); } catch (e) { /* ignore */ }
+    // личная память «На устройстве» (отпечатки ваших фото и составы блюд) — тоже ваши данные; сама модель остаётся скачанной
+    if (typeof OnDevice !== 'undefined') OnDevice.memory.clear();
     state.date = todayStr();
     renderView();
     toast('Все данные удалены');
@@ -3014,7 +3017,7 @@
       if (location.hash !== '#' + v) location.hash = v; else showView(v);
       return;
     }
-    // кнопки блоков «Распознавание по фото», «Эталоны размера», «Что приложение запомнило»
+    // кнопки блоков «На устройстве», «Распознавание по фото», «Эталоны размера», «Что приложение запомнило»
     var aiBtn = e.target.closest('[data-ai]');
     if (aiBtn && !aiBtn.disabled && PhotoUI.onSettingsAction(aiBtn)) return;
     var btn = e.target.closest('[data-action]');

@@ -81,3 +81,27 @@
 .dish-actions { padding: 2px 0 6px 18px; }
 .btn.danger-text { color: var(--danger); }
 .btn.danger-text:hover { background: var(--danger-soft); }
+
+/* «На устройстве»: чипы вариантов, загрузка модели */
+.ph-others { margin-bottom: 10px; }
+.ph-others .ph-provider { margin: 8px 0; }
+.ph-od-card { margin-bottom: 10px; }
+.ph-od-card p { margin: 6px 0 8px; }
+.ph-dl { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-top: 8px; }
+.ph-dl[hidden] { display: none; }
+.ph-dl progress { flex: 1 1 160px; min-width: 120px; height: 10px; accent-color: var(--primary); }
+.ph-chips { flex-basis: 100%; display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 2px 0 2px; }
+.ph-chips-add { margin: 0 0 10px; }
+.ph-chips-label { font-size: .78rem; color: var(--muted); }
+.chip { min-height: 40px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--border-strong); background: var(--surface); color: var(--text); font: inherit; font-size: .85rem; cursor: pointer; text-align: left; max-width: 100%; overflow-wrap: anywhere; }
+.chip:hover { background: var(--primary-soft); border-color: var(--primary); }
+.chip:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.chip-add { border-style: dashed; }
+
+/* Низкий экран (телефон лёжа или с открытой клавиатурой): окно не должно состоять из одних кнопок */
+@media (max-height: 520px) {
+  .modal-head { padding-top: 8px; padding-bottom: 0; }
+  .modal-head h2 { font-size: 1rem; }
+  .modal-foot { flex-wrap: nowrap; gap: 6px; padding: 6px 12px calc(6px + env(safe-area-inset-bottom, 0px)); }
+  .modal-foot .btn { flex: 1 1 0; min-height: 36px; padding: 4px 8px; font-size: .88rem; white-space: normal; line-height: 1.15; }
+}
